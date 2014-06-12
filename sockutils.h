@@ -1,5 +1,8 @@
-#include<sys/types.h>
+#include<openssl/ssl.h>
+#include<openssl/bio.h>
+#include<openssl/x509.h>
 #include<sys/socket.h>
+#include<sys/types.h>
 #include<netdb.h>
 #include<stdio.h>
 
@@ -18,3 +21,5 @@ int printaddrinfo(struct addrinfo *ai, char *hname, char *sname, in_port_t *port
 int socktype2str(char *buff, size_t buffsize, int st);
 int protocol2str(char *buff, size_t buffsize, int pf);
 int connect_socket(struct addrinfo *addrs, int *ip_i);
+int decodeX509Chain(char **x509str, STACK_OF(X509) * chain);
+int decodeX509(char **x509str, X509 *crt);

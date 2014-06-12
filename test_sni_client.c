@@ -38,98 +38,9 @@ char *show_error(char *out, size_t size) {
     return out;
 }
 
-int decodeX509(char **x509str, X509 *crt) {
-    char *str_out;
-    X509_NAME *issuer;
-    X509_NAME *subject;
-    int str_size = 0;
-    char data[STRSIZE + 1];
-    int nbytes = 0;
-    int i = 0;
-    BIO *b = BIO_new(BIO_s_mem());
-    if (crt == NULL) {
-        *x509str = (char *) malloc(sizeof (char));
-        x509str[0] = '\0';
-        printf("x509 was null\n");
-        return -1;
-    }
-
-    BIO_printf(b, "#X509 Certificate:\n");
-    BIO_printf(b, "#   issuer: ");
-    issuer = X509_get_issuer_name(crt);
-    if (issuer == NULL) {
-        BIO_printf(b, "null");
-    } else {
-        X509_NAME_print_ex(b, issuer, 0, 0);
-    }
-    BIO_printf(b, "\n");
-    BIO_printf(b, "#    subject: ");
-    subject = X509_get_subject_name(crt);
-    if (issuer == NULL) {
-        BIO_printf(b, "null");
-    } else {
-        X509_NAME_print_ex(b, subject, 0, 0);
-    }
-    BIO_printf(b, "\n");
-
-    PEM_write_bio_X509(b, crt);
-    BIO_printf(b, "\n");
-    str_size = BIO_ctrl_pending(b);
-    str_out = (char *) malloc(sizeof (char) *(str_size + 1));
-    if (str_out == NULL) {
-        printf("Error allocating %i bytes for crt string\n", str_size);
-        BIO_free(b);
-        return -1;
-    }
-    BIO_read(b, str_out, str_size);
-    str_out[str_size] = '\0';
-    *x509str = str_out;
-    BIO_free(b);
-    return 1;
-}
-
-int decodeX509Chain(char **x509str, STACK_OF(X509) * chain) {
-    X509 *crt;
-    BIO *b;
-    char *str_out;
-    char *x509_str;
-    int i;
-    int n_x509s;
-    int str_size;
-    b = BIO_new(BIO_s_mem());
-    if (chain == NULL) {
-        printf("Chain was empty\n");
-        return -1;
-    }
-    n_x509s = sk_X509_num(chain);
-    printf("X509 Chain\n");
-    for (i = 0; i < n_x509s; i++) {
-        crt = (X509 *) sk_X509_value(chain, i);
-        if (decodeX509(&x509_str, crt) < 0) {
-            BIO_printf(b, "chain was empty\n");
-        } else {
-            BIO_printf(b, "cert[%3i]:\n%s", i, x509_str);
-            BIO_flush(b);
-            free(x509_str);
-        }
-    }
-    str_size = BIO_ctrl_pending(b);
-    str_out = (char *) malloc(sizeof (char) *(str_size + 1));
-    if (str_out == NULL) {
-        printf("Error allocating %i bytes for out buffer\n", str_size + 1);
-        return -1;
-    }
-    BIO_read(b, str_out, str_size);
-    str_out[str_size] = '\0';
-    *x509str = str_out;
-    BIO_free(b);
-    return 1;
-}
-
 int drain_bio(BIO *b, char **data) {
     char *str_out;
     int str_size;
-    char *out;
     str_size = BIO_ctrl_pending(b);
     str_out = (char *) malloc(sizeof (char) *(str_size + 1));
     if (str_out == NULL) {
@@ -176,33 +87,23 @@ int init_ssl_ctx(sslcontainer_t *cnt, char *sni_host) {
         printf("Error creating SSL object\n");
     }
     SSL_set_tlsext_host_name(cnt->ssl, sni_host);
-    return 0;
-}
-
-int clearstr(char *str, int len) {
-    register char *curr = str;
-    register char *stop = str + len;
-    while (curr < stop) {
-        *curr++ = '\0';
-    }
+    SSL_set_mode(cnt->ssl, SSL_MODE_AUTO_RETRY);
     return 0;
 }
 
 int main(int argc, char **argv) {
     sslcontainer_t cnt;
+    BIO *b = BIO_new(BIO_s_mem());
     char *parsed_x509;
     char *buff;
     char ip[IPSTRSIZE];
-    char err_str[ERRORSTRSIZE + 1];
     char ai_family_str[AFFAMILYSTRSIZE + 1];
     char *fmt;
     struct addrinfo *addrs;
-    int sock;
     int ai_family;
     char *sni_host;
     char *target_host;
     char *service;
-    unsigned long err_num = 0;
     uint16_t port;
     int sock_fd;
     int ip_num = 0;
@@ -234,6 +135,8 @@ int main(int argc, char **argv) {
     // Must init the OpenSSL library
     printf("initializeing CTX context\n");
     SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    SSL_load_error_strings();
     if (init_ssl_ctx(&cnt, sni_host) < 0) {
         printf("Error creating SSL context\n");
         return -1;
@@ -264,7 +167,6 @@ int main(int argc, char **argv) {
     }
     printf("%s\n", parsed_x509);
     free(parsed_x509);
-    BIO *b = BIO_new(BIO_s_mem());
     BIO_printf(b, "GET / HTTP/1.1\r\n");
     BIO_printf(b, "HOST: %s\r\n\r\n", sni_host);
     BIO_flush(b);

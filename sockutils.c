@@ -1,12 +1,16 @@
-#include<sys/types.h>
+#include<openssl/ssl.h>
+#include<openssl/bio.h>
+#include<openssl/x509.h>
 #include<sys/socket.h>
+#include<sys/types.h>
 #include<stdio.h>
 #include<netdb.h>
 #include<string.h>
-#include"sockutils.h"
 #include<arpa/inet.h>
 #include<ctype.h>
 #include<unistd.h>
+#include"sockutils.h"
+
 #define STRSIZE 1024
 
 int strnlower(char *dst, char *src, size_t n) {
@@ -161,8 +165,6 @@ int printaddrinfo(struct addrinfo *ai, char *hname, char *sname, in_port_t *port
     char ai_familystr[STRSIZE + 1];
     char ai_socktypestr[STRSIZE + 1];
     char ai_protocolstr[STRSIZE + 1];
-    char host[STRSIZE + 1];
-    char serv[STRSIZE + 1];
 
     affamily2str(ai_familystr, STRSIZE, ai->ai_family);
     socktype2str(ai_socktypestr, STRSIZE, ai->ai_socktype);
@@ -290,3 +292,88 @@ int protocol2str(char *buff, size_t buffsize, int pf) {
     return 0;
 }
 
+int decodeX509(char **x509str, X509 *crt) {
+    char *str_out;
+    X509_NAME *issuer;
+    X509_NAME *subject;
+    int str_size = 0;
+    int i = 0;
+    BIO *b = BIO_new(BIO_s_mem());
+    if (crt == NULL) {
+        *x509str = (char *) malloc(sizeof (char));
+        x509str[0] = '\0';
+        printf("x509 was null\n");
+        return -1;
+    }
+
+    BIO_printf(b, "#X509 Certificate:\n");
+    BIO_printf(b, "#   issuer: ");
+    issuer = X509_get_issuer_name(crt);
+    if (issuer == NULL) {
+        BIO_printf(b, "null");
+    } else {
+        X509_NAME_print_ex(b, issuer, 0, 0);
+    }
+    BIO_printf(b, "\n");
+    BIO_printf(b, "#    subject: ");
+    subject = X509_get_subject_name(crt);
+    if (issuer == NULL) {
+        BIO_printf(b, "null");
+    } else {
+        X509_NAME_print_ex(b, subject, 0, 0);
+    }
+    BIO_printf(b, "\n");
+
+    PEM_write_bio_X509(b, crt);
+    BIO_printf(b, "\n");
+    str_size = BIO_ctrl_pending(b);
+    str_out = (char *) malloc(sizeof (char) *(str_size + 1));
+    if (str_out == NULL) {
+        printf("Error allocating %i bytes for crt string\n", str_size);
+        BIO_free(b);
+        return -1;
+    }
+    BIO_read(b, str_out, str_size);
+    str_out[str_size] = '\0';
+    *x509str = str_out;
+    BIO_free(b);
+    return 1;
+}
+
+int decodeX509Chain(char **x509str, STACK_OF(X509) * chain) {
+    X509 *crt;
+    BIO *b;
+    char *str_out;
+    char *x509_str;
+    int i;
+    int n_x509s;
+    int str_size;
+    b = BIO_new(BIO_s_mem());
+    if (chain == NULL) {
+        printf("Chain was empty\n");
+        return -1;
+    }
+    n_x509s = sk_X509_num(chain);
+    printf("X509 Chain\n");
+    for (i = 0; i < n_x509s; i++) {
+        crt = (X509 *) sk_X509_value(chain, i);
+        if (decodeX509(&x509_str, crt) < 0) {
+            BIO_printf(b, "chain was empty\n");
+        } else {
+            BIO_printf(b, "cert[%3i]:\n%s", i, x509_str);
+            BIO_flush(b);
+            free(x509_str);
+        }
+    }
+    str_size = BIO_ctrl_pending(b);
+    str_out = (char *) malloc(sizeof (char) *(str_size + 1));
+    if (str_out == NULL) {
+        printf("Error allocating %i bytes for out buffer\n", str_size + 1);
+        return -1;
+    }
+    BIO_read(b, str_out, str_size);
+    str_out[str_size] = '\0';
+    *x509str = str_out;
+    BIO_free(b);
+    return 1;
+}
