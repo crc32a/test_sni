@@ -120,9 +120,7 @@ int main(int argc, char **argv) {
     printf(fmt, ai_family_str, ip, port);
     // Must init the OpenSSL library
     printf("initializeing CTX context\n");
-    SSL_library_init();
-    OpenSSL_add_all_algorithms();
-    SSL_load_error_strings();
+    init_ssl_lib();
     if (init_ssl_ctx(&cnt, sni_host) < 0) {
         printf("Error creating SSL context\n");
         return -1;

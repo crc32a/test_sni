@@ -1,5 +1,6 @@
 *.o
 test_sni_client
 test_sni_server
+nid_lookup
 lookup
 Makefile-test_sni.mk

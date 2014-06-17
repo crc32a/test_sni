@@ -265,10 +265,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "pid = %i\n", getpid());
     fprintf(stderr, "ppid = %i\n", getppid());
     fprintf(stderr, "Initializing SSL library\n");
-    SSL_library_init();
-    OpenSSL_add_all_algorithms();
-    SSL_load_error_strings();
-
+    init_ssl_lib();
     cnt.key_file = key;
     cnt.crt_file = crt;
     cnt.chain_file = chain;

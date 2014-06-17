@@ -13,6 +13,7 @@
 #include"sockutils.h"
 
 #define STRSIZE 1024
+#define CNSTRSIZE 256
 
 char bit_vals[] = {'0', '1'};
 
@@ -332,8 +333,54 @@ int protocol2str(char *buff, size_t buffsize, int pf) {
     return 0;
 }
 
+int decodeX509CN(char *cn, X509 *crt, int useSubject, size_t buff_size) {
+    unsigned char *data;
+    X509_NAME_ENTRY *ent;
+    int loc = 0;
+    int i;
+    int nbytes;
+    char *cn_ptr;
+    cn_ptr = cn;
+    *cn_ptr = '\0';
+    if (crt == NULL) {
+        return -1;
+    }
+    X509_NAME *name;
+    if (useSubject) {
+        name = X509_get_subject_name(crt);
+    } else {
+        name = X509_get_issuer_name(crt);
+    }
+    if (name == NULL) {
+        return -1;
+    }
+    //int cn_id = NID_commonName;
+    //X509_NAME_get_text_by_NID(name, NID_commonName, cn, buff_size);
+
+    loc = X509_NAME_get_index_by_NID(name, NID_commonName, -1);
+    if (loc < 0) {
+        return -1;
+    }
+    ent = X509_NAME_get_entry(name, loc);
+    if (ent == NULL) {
+        return -1;
+    }
+    if (ent->value == NULL || ent->value->data == NULL) {
+        return -1;
+    }
+    nbytes = (ent->value->length > buff_size) ? buff_size : ent->value->length;
+    data = ent->value->data;
+    for (i = 0; i < nbytes; i++) {
+        *cn_ptr++ = *data++;
+    }
+    *cn_ptr++ = '\0';
+    return 0;
+}
+
 int decodeX509(char **x509str, X509 *crt) {
     char *str_out;
+    char cn[CNSTRSIZE + 1];
+
     X509_NAME *issuer;
     X509_NAME *subject;
     int str_size = 0;
@@ -347,6 +394,7 @@ int decodeX509(char **x509str, X509 *crt) {
     }
 
     BIO_printf(b, "#X509 Certificate:\n");
+
     BIO_printf(b, "#   issuer: ");
     issuer = X509_get_issuer_name(crt);
     if (issuer == NULL) {
@@ -355,6 +403,11 @@ int decodeX509(char **x509str, X509 *crt) {
         X509_NAME_print_ex(b, issuer, 0, 0);
     }
     BIO_printf(b, "\n");
+
+    decodeX509CN(cn, crt, 0, CNSTRSIZE);
+    BIO_printf(b, "issuerCN=%s\n", cn);
+    BIO_printf(b, "\n");
+
     BIO_printf(b, "#    subject: ");
     subject = X509_get_subject_name(crt);
     if (issuer == NULL) {
@@ -363,9 +416,14 @@ int decodeX509(char **x509str, X509 *crt) {
         X509_NAME_print_ex(b, subject, 0, 0);
     }
     BIO_printf(b, "\n");
+    decodeX509CN(cn, crt, 1, CNSTRSIZE);
+    BIO_printf(b, "subjectCN=%s\n", cn);
+    BIO_printf(b, "\n");
 
+    BIO_printf(b, "PEM Encoding:\n");
     PEM_write_bio_X509(b, crt);
     BIO_printf(b, "\n");
+    BIO_flush(b);
     str_size = BIO_ctrl_pending(b);
     str_out = (char *) malloc(sizeof (char) *(str_size + 1));
     if (str_out == NULL) {
@@ -466,4 +524,10 @@ int ssl_mode_str(char **buff, long m) {
     BIO_free(b);
 
 
+}
+
+int init_ssl_lib() {
+    SSL_library_init();
+    OpenSSL_add_all_algorithms();
+    SSL_load_error_strings();
 }
