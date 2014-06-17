@@ -456,9 +456,11 @@ int ssl_mode_str(char **buff, long m) {
     if (m & SSL_MODE_AUTO_RETRY) {
         BIO_printf(b, "|SSL_MODE_AUTO_RETRY ");
     }
+#if defined SSL_MODE_RELEASE_BUFFERS
     if (m & SSL_MODE_RELEASE_BUFFERS) {
         BIO_printf(b, "|SSL_MODE_RELEASE_BUFFERS ");
     }
+#endif
     BIO_printf(b, "}");
     resp = drain_bio(b, buff);
     BIO_free(b);
