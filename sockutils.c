@@ -3,6 +3,7 @@
 #include<openssl/x509.h>
 #include<sys/socket.h>
 #include<sys/types.h>
+#include<limits.h>
 #include<stdio.h>
 #include<netdb.h>
 #include<string.h>
@@ -12,6 +13,8 @@
 #include"sockutils.h"
 
 #define STRSIZE 1024
+
+char bit_vals[] = {'0', '1'};
 
 int strnlower(char *dst, char *src, size_t n) {
     int i;
@@ -74,6 +77,43 @@ int connect_socket(struct addrinfo *addrs, int *ip_i) {
     }
     *ip_i = -1;
     return -1;
+}
+
+int ssl_error_str(char *error_buff, size_t nbytes, int error_code) {
+    switch (error_code) {
+        case SSL_ERROR_NONE:
+            strncpy(error_buff, "SSL_ERROR_NONE", nbytes);
+            break;
+        case SSL_ERROR_ZERO_RETURN:
+            strncpy(error_buff, "SSL_ERROR_ZERO_RETURN", nbytes);
+            break;
+        case SSL_ERROR_WANT_READ:
+            strncpy(error_buff, "SSL_ERROR_WANT_READ", nbytes);
+            break;
+        case SSL_ERROR_WANT_WRITE:
+            strncpy(error_buff, "SSL_ERROR_WANT_WRITE", nbytes);
+            break;
+        case SSL_ERROR_WANT_CONNECT:
+            strncpy(error_buff, "SSL_ERROR_WANT_CONNECT", nbytes);
+            break;
+            break;
+        case SSL_ERROR_WANT_ACCEPT:
+            strncpy(error_buff, "SSL_ERROR_WANT_ACCEPT", nbytes);
+            break;
+        case SSL_ERROR_WANT_X509_LOOKUP:
+            strncpy(error_buff, "SSL_ERROR_WANT_X509_LOOKUP", nbytes);
+            break;
+        case SSL_ERROR_SYSCALL:
+            strncpy(error_buff, "SSL_ERROR_SYSCALL", nbytes);
+            break;
+        case SSL_ERROR_SSL:
+            strncpy(error_buff, "SSL_ERROR_SSL", nbytes);
+            break;
+        default:
+            strncpy(error_buff, "UNKNOWN", nbytes);
+
+    }
+    return 0;
 }
 
 int affamily2str(char *buff, size_t buffsize, int af) {
@@ -376,4 +416,52 @@ int decodeX509Chain(char **x509str, STACK_OF(X509) * chain) {
     *x509str = str_out;
     BIO_free(b);
     return 1;
+}
+
+int get_long_bits(char *bits_str, long bits) {
+    int i;
+    *bits_str++ = '0';
+    for (i = CHAR_BIT * sizeof (long) - 2; i >= 0; i--) {
+        *bits_str++ = bit_vals[(bits >> i)&1];
+    }
+    *bits_str++ = '\0';
+}
+
+int drain_bio(BIO *b, char **data) {
+    char *str_out;
+    int str_size;
+    str_size = BIO_ctrl_pending(b);
+    str_out = (char *) malloc(sizeof (char) *(str_size + 1));
+    if (str_out == NULL) {
+        return -1;
+    }
+    str_out[str_size] = '\0';
+    BIO_read(b, str_out, str_size);
+    *data = str_out;
+    return str_size;
+}
+
+int ssl_mode_str(char **buff, long m) {
+    int resp = 0;
+    char bits_str[sizeof (long) *CHAR_BIT + 1];
+    get_long_bits(bits_str, m);
+    BIO *b = BIO_new(BIO_s_mem());
+    BIO_printf(b, "mode=%s {", bits_str);
+    if (m & SSL_MODE_ENABLE_PARTIAL_WRITE) {
+        BIO_printf(b, "|SSL_MODE_ENABLE_PARTIAL_WRITE ");
+    }
+    if (m & SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER) {
+        BIO_printf(b, "|SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER ");
+    }
+    if (m & SSL_MODE_AUTO_RETRY) {
+        BIO_printf(b, "|SSL_MODE_AUTO_RETRY ");
+    }
+    if (m & SSL_MODE_RELEASE_BUFFERS) {
+        BIO_printf(b, "|SSL_MODE_RELEASE_BUFFERS ");
+    }
+    BIO_printf(b, "}");
+    resp = drain_bio(b, buff);
+    BIO_free(b);
+
+
 }

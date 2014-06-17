@@ -23,3 +23,7 @@ int protocol2str(char *buff, size_t buffsize, int pf);
 int connect_socket(struct addrinfo *addrs, int *ip_i);
 int decodeX509Chain(char **x509str, STACK_OF(X509) * chain);
 int decodeX509(char **x509str, X509 *crt);
+int ssl_error_str(char *buff, size_t buffsize, int ec);
+int get_long_bits(char *bitsstr, long bits);
+int ssl_mode_str(char **buff, long mode);
+int drain_bio(BIO *b, char **data);

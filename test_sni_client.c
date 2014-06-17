@@ -38,20 +38,6 @@ char *show_error(char *out, size_t size) {
     return out;
 }
 
-int drain_bio(BIO *b, char **data) {
-    char *str_out;
-    int str_size;
-    str_size = BIO_ctrl_pending(b);
-    str_out = (char *) malloc(sizeof (char) *(str_size + 1));
-    if (str_out == NULL) {
-        return -1;
-    }
-    str_out[str_size] = '\0';
-    BIO_read(b, str_out, str_size);
-    *data = str_out;
-    return str_size;
-}
-
 int connect_ssl(sslcontainer_t *cnt) {
     int ssl_connect_resp;
     char err_str[ERRORSTRSIZE + 1];
