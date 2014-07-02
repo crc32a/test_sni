@@ -10,12 +10,71 @@
 #include<arpa/inet.h>
 #include<ctype.h>
 #include<unistd.h>
+#include<errno.h>
 #include"sockutils.h"
 
 #define STRSIZE 1024
 #define CNSTRSIZE 256
+#define BUFFSIZE 1024
 
 char bit_vals[] = {'0', '1'};
+
+int read_file(char **buff, int fd) {
+    char local_buff[BUFFSIZE + 1];
+    char *drain_buff = NULL;
+    char *fmt;
+    BIO *b;
+    int total_bytes = 0;
+    int nbytes = 0;
+    int drain_bytes = 0;
+    b = BIO_new(BIO_s_mem());
+    if (b == NULL) {
+        return -1;
+    }
+    for (;;) {
+        nbytes = read(fd, local_buff, BUFFSIZE);
+        if (nbytes == 0) {
+            break;
+        }
+        if (nbytes < 0) {
+            BIO_free(b);
+            return -1;
+        }
+        if (BIO_write(b, local_buff, nbytes) < nbytes) {
+            BIO_free(b);
+            return -1;
+        }
+        total_bytes += nbytes;
+    }
+
+    drain_bytes = drain_bio(b, &drain_buff);
+    if (drain_bytes != total_bytes) {
+        fmt = "Erro only got %i bytes but was expecting %i\n";
+        fprintf(stderr, fmt, drain_bytes, total_bytes);
+        BIO_free(b);
+        free(drain_buff);
+        return -1;
+    }
+    *buff = drain_buff;
+    BIO_free(b);
+    return total_bytes;
+}
+
+int expand_path(char *out, char *in, int n) {
+    char *resolved;
+    if (in == NULL) {
+        return -1;
+    }
+    resolved = realpath(in, NULL);
+    if (resolved == NULL) {
+        perror("resolved path error:");
+        strncpy(out, in, n);
+        return 0;
+    }
+    strncpy(out, resolved, n);
+    free(resolved);
+    return 0;
+}
 
 int strnlower(char *dst, char *src, size_t n) {
     int i;
@@ -436,6 +495,118 @@ int decodeX509(char **x509str, X509 *crt) {
     *x509str = str_out;
     BIO_free(b);
     return 1;
+}
+
+int free_string_list(string_list_t *sl) {
+    int i;
+    for (i - 0; i < sl->nwords; i++) {
+        sl->string_list[i] = NULL;
+    }
+    if (sl->string_block != NULL) {
+        free(sl->string_block);
+        sl->string_block = NULL;
+    }
+    if (sl->string_list != NULL) {
+        free(sl->string_list);
+        sl->string_list = NULL;
+    }
+    sl->nwords = 0;
+    return 0;
+}
+
+int chop(char *str_in) {
+    int length = 0;
+    length = strlen(str_in);
+    if (length == 0) {
+        return -1;
+    }
+    if (str_in[length - 1] != '\n') return 0;
+    str_in[length - 1] = '\0';
+    return 1;
+}
+
+
+// Split string on boundry and skip blanks
+
+int split_string(string_list_t *sl, char *strin, char split_ch) {
+    int nwords = 0;
+    ;
+    int nchars = 0;
+    int i = 0;
+    int nsize = 0;
+    char *strPtr = NULL;
+    char *curr_word = NULL;
+    int nbytes = 0;
+    if (strin == NULL) {
+        return -1;
+    }
+
+    nsize = sizeof (char) *(strlen(strin) + 1);
+    sl->string_block = (char *) malloc(nsize);
+    if (sl->string_block == NULL) {
+        return -1;
+    }
+    strcpy(sl->string_block, strin);
+    strPtr = sl->string_block;
+    for (;; strPtr++, nbytes++) {
+        if (*strPtr == '\0') {
+            if (nchars > 0) {
+                nwords++;
+            }
+            break;
+        }
+        if (*strPtr == split_ch) {
+            if (nchars <= 0) {
+                continue; // Skip blanks
+            }
+            nwords++;
+            nchars = 0;
+        } else {
+            nchars++;
+        }
+    }
+
+    nsize = sizeof (char*) *(nwords + 1);
+    sl->string_list = (char **) malloc(nsize);
+    if (sl->string_list == NULL) {
+        free(sl->string_block);
+        return -1;
+    }
+
+    sl->nwords = nwords;
+    for (i = 0; i <= nwords; i++) {
+        sl->string_list[i] = NULL;
+    }
+
+    strPtr = sl->string_block;
+    curr_word = strPtr;
+    nchars = 0;
+    nwords = 0;
+
+    for (;; strPtr++) {
+        if (*strPtr == '\0') {
+            if (nchars > 0) {
+                sl->string_list[nwords] = curr_word;
+                nwords++;
+            }
+            break;
+        }
+        if (*strPtr == split_ch) {
+            *strPtr = '\0';
+            if (nchars <= 0) {
+                // Skip this word since its 0 bytes long
+                curr_word = strPtr + 1;
+                continue;
+            }
+            sl->string_list[nwords] = curr_word;
+            curr_word = strPtr + 1;
+            nchars = 0;
+            nwords++;
+        } else {
+            nchars++;
+        }
+    }
+    return nwords;
 }
 
 int decodeX509Chain(char **x509str, STACK_OF(X509) * chain) {

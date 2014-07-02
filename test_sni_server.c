@@ -36,21 +36,6 @@ char *show_error(char *out, size_t size) {
     return out;
 }
 
-int expand_path(char *out, char *in, int n) {
-    char *resolved;
-    if (in == NULL) {
-        return -1;
-    }
-    resolved = realpath(in, NULL);
-    if (resolved == NULL) {
-        strncpy(out, in, n);
-        return 0;
-    }
-    strncpy(out, resolved, n);
-    free(resolved);
-    return 0;
-}
-
 int init_ssl_ctx(sslcontainer_t *cnt) {
     cnt->ctx = SSL_CTX_new(SSLv23_server_method());
     char full_key_path[MYPATH_MAX + 1];

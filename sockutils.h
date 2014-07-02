@@ -8,8 +8,19 @@
 
 #ifndef __SOCKUTILS_H
 #define __SOCKUTILS_H 1
+
+typedef struct {
+    char *string_block;
+    char **string_list;
+    int nwords;
+} string_list_t;
 #endif
 
+
+int free_string_list(string_list_t *sl);
+int chop(char *str_in);
+int split_string(string_list_t *sl, char *strin, char split_ch);
+int expand_path(char *out, char *in, int n);
 int strnlower(char *dst, char *src, size_t n);
 int getipaddrstr(struct addrinfo *ai, char *hname, uint16_t *port, socklen_t buffsize);
 int affamily2str(char *buff, size_t buffsize, int af);
@@ -27,5 +38,5 @@ int ssl_error_str(char *buff, size_t buffsize, int ec);
 int get_long_bits(char *bitsstr, long bits);
 int ssl_mode_str(char **buff, long mode);
 int drain_bio(BIO *b, char **data);
-int decodeX509CN(char *cn, X509 *crt, int useSubject,size_t buff_size);
+int decodeX509CN(char *cn, X509 *crt, int useSubject, size_t buff_size);
 int init_ssl_lib();

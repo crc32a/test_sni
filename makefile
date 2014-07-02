@@ -2,7 +2,10 @@
 CF= -O0 -ggdb -I/opt/local/include -L/opt/local/lib
 LIBS = -lcrypto -lssl
 
-all: test_sni_client lookup test_sni_server nid_lookup
+all: test_sni_client lookup test_sni_server nid_lookup parse_x509
+
+parse_x509.o: sockutils.h parse_x509.c
+	cc $(CF) -c parse_x509.c
 
 sockutils.o: sockutils.h sockutils.c
 	cc $(CF) -c sockutils.c
@@ -31,7 +34,11 @@ lookup: lookup.o sockutils.o
 nid_lookup: nid_lookup.o sockutils.o
 	cc $(CF) -o nid_lookup nid_lookup.o sockutils.o $(LIBS)
 
+parse_x509: parse_x509.o sockutils.o
+	cc $(CF) -o parse_x509 parse_x509.o sockutils.o $(LIBS)
+
 clean:
+	rm parse_x509
 	rm test_sni_client
 	rm test_sni_server
 	rm lookup
