@@ -662,6 +662,7 @@ int drain_bio(BIO *b, char **data) {
     str_size = BIO_ctrl_pending(b);
     str_out = (char *) malloc(sizeof (char) *(str_size + 1));
     if (str_out == NULL) {
+        *data = NULL;
         return -1;
     }
     str_out[str_size] = '\0';

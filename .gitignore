@@ -1,6 +1,11 @@
 *.o
+*.crt
+*.pem
 test_sni_client
 test_sni_server
 nid_lookup
+nid2sn
+parse_x509
 lookup
+txt2nid
 Makefile-test_sni.mk
