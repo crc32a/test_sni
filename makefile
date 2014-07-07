@@ -44,10 +44,5 @@ parse_x509: parse_x509.o sockutils.o
 	cc $(CF) -o parse_x509 parse_x509.o sockutils.o $(LIBS)
 
 clean:
-	rm parse_x509
-	rm test_sni_client
-	rm test_sni_server
-	rm lookup
-	rm txt2nid
-	rm *.o
+	rm parse_x509 test_sni_client test_sni_server lookup txt2nid nid2sn *.o
 

@@ -15,11 +15,17 @@
 #define MYPATH_MAX 512
 #define STRSIZE 1024
 
-struct X509_NAME_component {
+typedef struct {
     char *short_name;
-    char *val;
+    char *long_name;
+    ASN1_STRING value;
     int nid;
-};
+} X509_NAME_component_t;
+
+typedef struct {
+    X509_NAME_component_t *entries;
+    int n_entries;
+} X509_NAME_components_t;
 
 int usage(char *prog) {
     printf("usage %s <x509_pem>\n", prog);
@@ -28,54 +34,138 @@ int usage(char *prog) {
     return 0;
 }
 
-int decodeX509NameComponents(X509_NAME *name, struct X509_NAME_component **comps) {
+int X509_NAME_components_new(X509_NAME_components_t **comps, int n_entries) {
     int tmp_size = 0;
-    BIO *b = NULL;
-    int n_entries = 0;
     int i = 0;
-    int nid = 0;
-    char *sn = NULL;
-    struct X509_NAME_component *c = NULL;
-    X509_NAME_ENTRY *ne = NULL;
-    b = BIO_new(BIO_s_mem());
-    if (b == NULL) {
+    X509_NAME_components_t *comps_st = NULL;
+    X509_NAME_component_t *entries_st = NULL;
+    tmp_size = sizeof (X509_NAME_components_t);
+    comps_st = (X509_NAME_components_t *) malloc(tmp_size);
+    if (comps_st == NULL) {
         return -1;
     }
+    tmp_size = sizeof (X509_NAME_component_t) * n_entries;
+    entries_st = (X509_NAME_component_t *) malloc(tmp_size);
+    if (entries_st == NULL) {
+        free(comps_st);
+        return -2;
+    }
+    comps_st->n_entries = n_entries;
+    comps_st->entries = entries_st;
+    for (i = 0; i < n_entries; i++) {
+        comps_st->entries[i].nid = 0;
+        comps_st->entries[i].long_name = NULL;
+        comps_st->entries[i].short_name = NULL;
+        comps_st->entries[i].value.data = NULL;
+        comps_st->entries[i].value.flags = 0;
+        comps_st->entries[i].value.length = 0;
+        comps_st->entries[i].value.type = 0;
+    }
+    *comps = comps_st;
+    return 0;
+}
+
+int X509_NAME_components_free(X509_NAME_components_t *st) {
+    int n_entries = 0;
+    int i = 0;
+    n_entries = st->n_entries;
+    for (i = 0; i < n_entries; i++) {
+        if (st->entries[i].long_name != NULL) {
+            free(st->entries[i].long_name);
+            st->entries[i].long_name = NULL;
+        }
+        if (st->entries[i].short_name != NULL) {
+            free(st->entries[i].short_name);
+            st->entries[i].short_name = NULL;
+        }
+        if (st->entries[i].value.data != NULL) {
+            free(st->entries[i].value.data);
+            st->entries[i].value.data = NULL;
+        }
+    }
+    st->n_entries = 0;
+    free(st->entries);
+    st->entries = NULL;
+    free(st);
+
+    return 0;
+}
+
+int decodeX509NameComponents(X509_NAME *name, X509_NAME_components_t **comps) {
+    int tmp_size = 0;
+    int n_entries = 0;
+    int i = 0;
+    int j;
+    int nid = 0;
+    int str_len = 0;
+    char *sn = NULL;
+    char *ln = NULL;
+    X509_NAME_ENTRY *ne = NULL;
+
+
     n_entries = sk_X509_NAME_ENTRY_num(name->entries);
-    tmp_size = sizeof (struct X509_NAME_component) *n_entries;
-    c = (struct X509_NAME_component *) malloc(tmp_size);
+    X509_NAME_components_t *comps_st;
+    if (X509_NAME_components_new(&comps_st, n_entries) < 0) {
+        return -1;
+    }
+
     for (i = 0; i < n_entries; i++) {
         ne = sk_X509_NAME_ENTRY_value(name->entries, i);
         nid = OBJ_obj2nid(ne->object);
-        c[i].nid = nid;
+        comps_st->entries[i].nid = nid;
         sn = (char *) OBJ_nid2sn(nid);
-        c[i].short_name = sn;
+        ln = (char *) OBJ_nid2ln(nid);
+        str_len = strlen(sn);
+        comps_st->entries[i].short_name = (char *) malloc(str_len + 1);
+        comps_st->entries[i].nid = nid;
+        if (comps_st->entries[i].short_name != NULL) {
+            strncpy(comps_st->entries[i].short_name, sn, str_len);
+            comps_st->entries[i].short_name[str_len] = '\0';
+        }
+
+        str_len = strlen(ln);
+        comps_st->entries[i].long_name = (char *) malloc(str_len + 1);
+        if (comps_st->entries[i].long_name != NULL) {
+            strncpy(comps_st->entries[i].long_name, ln, str_len);
+            comps_st->entries[i].long_name[str_len] = '\0';
+        }
+        comps_st->entries[i].value.flags = ne->value->flags;
+        comps_st->entries[i].value.length = ne->value->length;
+        comps_st->entries[i].value.type = ne->value->type;
+        str_len = ne->value->length;
+        comps_st->entries[i].value.data = (unsigned char *) malloc(str_len + 1);
+        if (comps_st->entries[i].value.data != NULL) {
+            memcpy(comps_st->entries[i].value.data, ne->value->data, str_len);
+            comps_st->entries[i].value.data[str_len] = '\0';
+        }
     }
-    BIO_free(b);
-    *comps = c;
+    *comps = comps_st;
     return n_entries;
 }
 
-int x509comps_string(char **str, struct X509_NAME_component *comps, int n_comps) {
-    BIO *b;
-    int i;
+int x509comps_string(char **str, X509_NAME_components_t *comps) {
+    BIO *b = NULL;
+    int i = 0;
+    int n_entries = 0;
     b = BIO_new(BIO_s_mem());
     if (b == NULL) {
         return -1;
     }
-    if (n_comps <= 0) {
+    n_entries = comps->n_entries;
+    if (n_entries <= 0) {
         BIO_flush(b);
         drain_bio(b, str);
         BIO_free(b);
         return 0;
     }
     BIO_printf(b, "%s", "[");
-    for (i = 0; i < n_comps; i++) {
-        BIO_printf(b, "(\"%i\",\"%s\",\"%p\")", comps[i].nid, comps[i].short_name, comps[i].val);
+    for (i = 0; i < n_entries; i++) {
+        BIO_printf(b, "(%i,\"%s\",\"%s\")\n", comps->entries[i].nid, comps->entries[i].short_name, comps->entries[i].value.data);
     }
     BIO_printf(b, "%s", "]");
     BIO_flush(b);
     drain_bio(b, str);
+    BIO_free(b);
     return 0;
 }
 
@@ -85,7 +175,7 @@ int get_general_name_string(char **type, char **val, GENERAL_NAME *gn) {
     unsigned char *p = NULL;
     int n_comps = 0;
     X509_NAME *name = NULL;
-    struct X509_NAME_component *comps = NULL;
+    X509_NAME_components_t *comps = NULL;
     char *comp_str = NULL;
     int status = 0;
     int i = 0;
@@ -148,10 +238,11 @@ int get_general_name_string(char **type, char **val, GENERAL_NAME *gn) {
             name = gn->d.directoryName;
             n_comps = decodeX509NameComponents(name, &comps);
             if (n_comps > 0) {
-                x509comps_string(&comp_str, comps, n_comps);
+                x509comps_string(&comp_str, comps);
                 BIO_printf(val_bio, "%s", comp_str);
-                free(comps);
+                X509_NAME_components_free(comps);
                 free(comp_str);
+
             }
             break;
         default:
@@ -195,6 +286,8 @@ int getNamesFromAltSubjectNameExt(char **vals, X509_EXTENSION *ext) {
         status = get_general_name_string(&type, &val, gn);
         if (status == 0) {
             BIO_printf(b, "%s:%s\n", type, val);
+            free(type);
+            free(val);
         }
     }
     BIO_flush(b);
@@ -212,6 +305,7 @@ int getSubject(char **subject, X509 * x509) {
 }
 
 int main(int argc, char **argv) {
+    char *line = NULL;
     char *file_name = NULL;
     char *obj_name = NULL;
     int tmp_size = 0;
@@ -224,13 +318,18 @@ int main(int argc, char **argv) {
     X509_EXTENSION *ext = NULL;
     ASN1_OCTET_STRING *data = NULL;
     int i = 0;
+    int j = 0;
     int n_exts = 0;
+    int n_loops; // testing for memory leaks.
     int nid = 0;
-    if (argc < 2) {
-        usage(argv[0]);
-        return 0;
-    }
+    pid_t this_pid = 0;
+    this_pid = getpid();
     tmp_size = sizeof (char) *(STRSIZE + 1);
+    line = (char *) malloc(tmp_size);
+    if (line == NULL) {
+        printf("Error allocating %i bytes for line buffer\n", tmp_size);
+        return -1;
+    }
     file_name = (char *) malloc(tmp_size);
     if (file_name == NULL) {
         printf("Error allocating %i bytes for file_name\n", tmp_size);
@@ -241,18 +340,25 @@ int main(int argc, char **argv) {
         printf("Error failed to allocate %i bytes for X509 CTX object\n", tmp_size);
         return -1;
     }
+    printf("Enter x509 file name: ");
+    fflush(stdout);
+    if (fgets(file_name, STRSIZE, stdin) == NULL) {
+        printf("Error reading file name from stdin\n");
+        return -1;
+    }
+    chop(file_name);
     init_ssl_lib();
     out = BIO_new_fp(stdout, BIO_NOCLOSE);
     if (out == NULL) {
         printf("Error creating output BIO file\n");
         return -1;
     }
-    strncpy(file_name, argv[1], STRSIZE);
     fp = fopen(file_name, "r");
     if (fp == NULL) {
         printf("Error opening file %s\n", file_name);
         return -1;
     }
+
     if (PEM_read_X509(fp, &x509, NULL, NULL) == NULL) {
         printf("Error reading x509 file\n");
         return -1;
@@ -261,26 +367,39 @@ int main(int argc, char **argv) {
         perror("Odd coulden't close x509 file:");
     }
     n_exts = X509_get_ext_count(x509);
-    printf("Found %i extensions\n", n_exts);
-    for (i = 0; i < n_exts; i++) {
-        //ext = X509_EXTENSION_new();
-        ext = X509_get_ext(x509, i);
-        if (ext == NULL) {
-            printf("Error getting X509 extension\n");
-            return -1;
+    // Leak loop
+    for (;;) {
+        printf("pid[%i]: Enter number of times to decode file %s: ", this_pid, file_name);
+        if (fgets(line, STRSIZE, stdin) == NULL) {
+            printf("unable to read from stdin. Possible EOF\n");
+            break;
         }
-        nid = OBJ_obj2nid(ext->object);
-        obj_name = (char *) OBJ_nid2sn(nid);
-        BIO_printf(out, "ext[%i]: nid=%i = \"%s\"\n", i, nid, obj_name);
-        if (nid == NID_subject_alt_name) {
-            getNamesFromAltSubjectNameExt(&gn_str, ext);
-            BIO_printf(out, "Decoded GeneralName = %s\n", gn_str);
-            BIO_flush(out);
+        chop(line);
+        n_loops = atoi(line);
+        printf("Decoing %i times\n", n_loops);
+        for (j = 0; j <= n_loops; j++) {
+            if (j == n_loops) printf("Found %i extensions\n", n_exts);
+            for (i = 0; i < n_exts; i++) {
+                ext = X509_get_ext(x509, i);
+                if (ext == NULL) {
+                    printf("Error getting X509 extension\n");
+                    return -1;
+                }
+                nid = OBJ_obj2nid(ext->object);
+                obj_name = (char *) OBJ_nid2sn(nid);
+                if (j == n_loops) BIO_printf(out, "ext[%i]: nid=%i = \"%s\"\n", i, nid, obj_name);
+                if (nid == NID_subject_alt_name) {
+                    getNamesFromAltSubjectNameExt(&gn_str, ext);
+                    if (j == n_loops) BIO_printf(out, "Decoded GeneralName = %s\n", gn_str);
+                    free(gn_str);
+                    BIO_flush(out);
+                }
+                if (j == n_loops) X509V3_EXT_print(out, ext, 0, 0);
+                if (j == n_loops) BIO_printf(out, "\n");
+            }
         }
-        X509V3_EXT_print(out, ext, 0, 0);
-        BIO_printf(out, "\n");
-        X509_EXTENSION_free(ext);
     }
+    free(line);
     free(file_name);
     BIO_free(out);
     return 0;
