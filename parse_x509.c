@@ -2,6 +2,7 @@
 #include<openssl/asn1.h>
 #include<openssl/x509.h>
 #include<openssl/x509v3.h>
+#include<openssl/objects.h>
 #include<openssl/pem.h>
 #include<openssl/safestack.h>
 #include<sys/types.h>
@@ -18,6 +19,7 @@
 typedef struct {
     char *short_name;
     char *long_name;
+    char *oid;
     ASN1_STRING value;
     int nid;
 } X509_NAME_component_t;
@@ -56,6 +58,7 @@ int X509_NAME_components_new(X509_NAME_components_t **comps, int n_entries) {
         comps_st->entries[i].nid = 0;
         comps_st->entries[i].long_name = NULL;
         comps_st->entries[i].short_name = NULL;
+        comps_st->entries[i].oid = NULL;
         comps_st->entries[i].value.data = NULL;
         comps_st->entries[i].value.flags = 0;
         comps_st->entries[i].value.length = 0;
@@ -82,6 +85,10 @@ int X509_NAME_components_free(X509_NAME_components_t *st) {
             free(st->entries[i].value.data);
             st->entries[i].value.data = NULL;
         }
+        if (st->entries[i].oid != NULL) {
+            free(st->entries[i].oid);
+            st->entries[i].oid = NULL;
+        }
     }
     st->n_entries = 0;
     free(st->entries);
@@ -92,6 +99,7 @@ int X509_NAME_components_free(X509_NAME_components_t *st) {
 }
 
 int decodeX509NameComponents(X509_NAME *name, X509_NAME_components_t **comps) {
+    char buff[STRSIZE + 1];
     int tmp_size = 0;
     int n_entries = 0;
     int i = 0;
@@ -109,6 +117,7 @@ int decodeX509NameComponents(X509_NAME *name, X509_NAME_components_t **comps) {
 
     for (i = 0; i < n_entries; i++) {
         ne = sk_X509_NAME_ENTRY_value(name->entries, i);
+        unsigned char *wtf = (unsigned char *) ne->object->data;
         nid = OBJ_obj2nid(ne->object);
         comps_st->entries[i].nid = nid;
         sn = (char *) OBJ_nid2sn(nid);
@@ -135,6 +144,14 @@ int decodeX509NameComponents(X509_NAME *name, X509_NAME_components_t **comps) {
         if (comps_st->entries[i].value.data != NULL) {
             memcpy(comps_st->entries[i].value.data, ne->value->data, str_len);
             comps_st->entries[i].value.data[str_len] = '\0';
+        }
+        str_len = OBJ_obj2txt(buff, STRSIZE, (const ASN1_OBJECT *) ne->object, 1);
+        if (str_len > 0) {
+            comps_st->entries[i].oid = (char *) malloc(str_len + 1);
+            if (comps_st != NULL) {
+                strncpy(comps_st->entries[i].oid, buff, str_len);
+                comps_st->entries[i].oid[str_len] = '\0';
+            }
         }
     }
     *comps = comps_st;
@@ -186,11 +203,15 @@ int x509comps_string(char **str, X509_NAME_components_t *comps) {
         BIO_free(b);
         return 0;
     }
-    BIO_printf(b, "%s", "[");
+    BIO_printf(b, "%s", "[\n");
     for (i = 0; i < n_entries; i++) {
-        BIO_printf(b, "(%i,\"%s\",\"%s\")\n", comps->entries[i].nid, comps->entries[i].short_name, comps->entries[i].value.data);
+        BIO_printf(b, "(nid=%i, ", comps->entries[i].nid);
+        BIO_printf(b, "oid=%s, ", comps->entries[i].oid);
+        BIO_printf(b, "short_name=\"%s\", ", comps->entries[i].short_name);
+        BIO_printf(b, "ln=\"%s\", ", comps->entries[i].long_name);
+        BIO_printf(b, "val=\"%s\")\n", comps->entries[i].value.data);
     }
-    BIO_printf(b, "%s", "]");
+    BIO_printf(b, "%s", "]\n");
     BIO_flush(b);
     drain_bio(b, str);
     BIO_free(b);
