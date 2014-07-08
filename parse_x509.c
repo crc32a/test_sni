@@ -101,8 +101,6 @@ int decodeX509NameComponents(X509_NAME *name, X509_NAME_components_t **comps) {
     char *sn = NULL;
     char *ln = NULL;
     X509_NAME_ENTRY *ne = NULL;
-
-
     n_entries = sk_X509_NAME_ENTRY_num(name->entries);
     X509_NAME_components_t *comps_st;
     if (X509_NAME_components_new(&comps_st, n_entries) < 0) {
@@ -141,6 +139,36 @@ int decodeX509NameComponents(X509_NAME *name, X509_NAME_components_t **comps) {
     }
     *comps = comps_st;
     return n_entries;
+}
+
+int get_subject(char **subject, X509 * x509) {
+    X509_NAME_components_t *comps = NULL;
+    X509_NAME *name = NULL;
+    int n_comps = 0;
+    name = X509_get_subject_name(x509);
+    if (decodeX509NameComponents(name, &comps) < 0) {
+        return -1;
+    }
+    if (x509comps_string(subject, comps) < 0) {
+        return -1;
+    }
+    X509_NAME_components_free(comps);
+    return 0;
+}
+
+int get_issuer(char **issuer, X509 * x509) {
+    X509_NAME_components_t *comps = NULL;
+    X509_NAME *name = NULL;
+    int n_comps = 0;
+    name = X509_get_issuer_name(x509);
+    if (decodeX509NameComponents(name, &comps) < 0) {
+        return -1;
+    }
+    if (x509comps_string(issuer, comps) < 0) {
+        return -1;
+    }
+    X509_NAME_components_free(comps);
+    return 0;
 }
 
 int x509comps_string(char **str, X509_NAME_components_t *comps) {
@@ -302,12 +330,9 @@ int getNamesFromAltSubjectNameExt(char **vals, X509_EXTENSION *ext) {
     return 0;
 }
 
-int getSubject(char **subject, X509 * x509) {
-
-    return 0;
-}
-
 int main(int argc, char **argv) {
+    char *subject = NULL;
+    char *issuer = NULL;
     char *line = NULL;
     char *file_name = NULL;
     char *obj_name = NULL;
@@ -326,6 +351,9 @@ int main(int argc, char **argv) {
     int n_loops; // testing for memory leaks.
     int nid = 0;
     pid_t this_pid = 0;
+    double start_time = 0.0;
+    double end_time = 0.0;
+    double delta_time = 0.0;
     this_pid = getpid();
     tmp_size = sizeof (char) *(STRSIZE + 1);
     line = (char *) malloc(tmp_size);
@@ -379,8 +407,17 @@ int main(int argc, char **argv) {
         }
         chop(line);
         n_loops = atoi(line);
-        printf("Decoing %i times\n", n_loops);
+        printf("Decoding %i times\n", n_loops);
+        start_time = gettimevalue();
         for (j = 0; j <= n_loops; j++) {
+            if (get_subject(&subject, x509) >= 0) {
+                if (j == n_loops) printf("subjectName\n%s\n", subject);
+                free(subject);
+            }
+            if (get_issuer(&issuer, x509) >= 0) {
+                if (j == n_loops) printf("issuerName\n%s\n", issuer);
+                free(issuer);
+            }
             if (j == n_loops) printf("Found %i extensions\n", n_exts);
             for (i = 0; i < n_exts; i++) {
                 ext = X509_get_ext(x509, i);
@@ -401,6 +438,9 @@ int main(int argc, char **argv) {
                 if (j == n_loops) BIO_printf(out, "\n");
             }
         }
+        end_time = gettimevalue();
+        delta_time = end_time - start_time;
+        printf("Took %f seconds to iterate %i times\n", delta_time, n_loops);
     }
     free(line);
     free(file_name);

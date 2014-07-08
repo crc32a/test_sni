@@ -11,6 +11,7 @@
 #include<ctype.h>
 #include<unistd.h>
 #include<errno.h>
+#include<time.h>
 #include"sockutils.h"
 
 #define STRSIZE 1024
@@ -702,4 +703,15 @@ int init_ssl_lib() {
     SSL_library_init();
     OpenSSL_add_all_algorithms();
     SSL_load_error_strings();
+}
+
+double gettimevalue() {
+    double out;
+    struct timeval tv;
+    if (gettimeofday(&tv, NULL) == -1) {
+        perror("Error in call to xgettimeofday(&tv)\n");
+        return (-1.0);
+    }
+    out = (double) tv.tv_sec + (double) tv.tv_usec * 0.000001;
+    return (out);
 }

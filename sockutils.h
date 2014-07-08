@@ -40,3 +40,4 @@ int ssl_mode_str(char **buff, long mode);
 int drain_bio(BIO *b, char **data);
 int decodeX509CN(char *cn, X509 *crt, int useSubject, size_t buff_size);
 int init_ssl_lib();
+double gettimevalue();
