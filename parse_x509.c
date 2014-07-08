@@ -108,6 +108,7 @@ int decodeX509NameComponents(X509_NAME *name, X509_NAME_components_t **comps) {
     int str_len = 0;
     char *sn = NULL;
     char *ln = NULL;
+    const ASN1_OBJECT *obj = NULL;
     X509_NAME_ENTRY *ne = NULL;
     n_entries = sk_X509_NAME_ENTRY_num(name->entries);
     X509_NAME_components_t *comps_st;
@@ -145,7 +146,8 @@ int decodeX509NameComponents(X509_NAME *name, X509_NAME_components_t **comps) {
             memcpy(comps_st->entries[i].value.data, ne->value->data, str_len);
             comps_st->entries[i].value.data[str_len] = '\0';
         }
-        str_len = OBJ_obj2txt(buff, STRSIZE, (const ASN1_OBJECT *) ne->object, 1);
+        obj = (const ASN1_OBJECT *) ne->object;
+        str_len = OBJ_obj2txt(buff, STRSIZE, obj, 1);
         if (str_len > 0) {
             comps_st->entries[i].oid = (char *) malloc(str_len + 1);
             if (comps_st != NULL) {
@@ -352,6 +354,7 @@ int getNamesFromAltSubjectNameExt(char **vals, X509_EXTENSION *ext) {
 }
 
 int main(int argc, char **argv) {
+    char *fmt = NULL;
     char *subject = NULL;
     char *issuer = NULL;
     char *line = NULL;
@@ -389,7 +392,8 @@ int main(int argc, char **argv) {
     tmp_size = sizeof (X509V3_CTX);
     ctx = (X509V3_CTX *) malloc(tmp_size);
     if (ctx == NULL) {
-        printf("Error failed to allocate %i bytes for X509 CTX object\n", tmp_size);
+        fmt = "Error failed to allocate %i bytes for X509 CTX object\n";
+        printf(fmt, tmp_size);
         return -1;
     }
     printf("Enter x509 file name: ");
@@ -421,7 +425,8 @@ int main(int argc, char **argv) {
     n_exts = X509_get_ext_count(x509);
     // Leak loop
     for (;;) {
-        printf("pid[%i]: Enter number of times to decode file %s: ", this_pid, file_name);
+        fmt = "pid[%i]: Enter number of times to decode file %s: ";
+        printf(fmt, this_pid, file_name);
         if (fgets(line, STRSIZE, stdin) == NULL) {
             printf("unable to read from stdin. Possible EOF\n");
             break;
@@ -448,10 +453,15 @@ int main(int argc, char **argv) {
                 }
                 nid = OBJ_obj2nid(ext->object);
                 obj_name = (char *) OBJ_nid2sn(nid);
-                if (j == n_loops) BIO_printf(out, "ext[%i]: nid=%i = \"%s\"\n", i, nid, obj_name);
+                if (j == n_loops) {
+                    fmt = "ext[%i]: nid=%i = \"%s\"\n";
+                    BIO_printf(out, fmt, i, nid, obj_name);
+                }
                 if (nid == NID_subject_alt_name) {
                     getNamesFromAltSubjectNameExt(&gn_str, ext);
-                    if (j == n_loops) BIO_printf(out, "Decoded GeneralName = %s\n", gn_str);
+                    if (j == n_loops) {
+                        BIO_printf(out, "Decoded GeneralName = %s\n", gn_str);
+                    }
                     free(gn_str);
                     BIO_flush(out);
                 }
