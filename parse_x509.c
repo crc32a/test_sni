@@ -291,6 +291,9 @@ int getNamesFromAltSubjectNameExt(char **vals, X509_EXTENSION *ext) {
         }
     }
     BIO_flush(b);
+    if (gens != NULL) {
+        GENERAL_NAMES_free(gens);
+    }
     if (drain_bio(b, vals) < 0) {
         BIO_free(b);
         return -1;
