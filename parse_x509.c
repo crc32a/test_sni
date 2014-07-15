@@ -271,7 +271,7 @@ int get_general_name_string(char **type, char **val, GENERAL_NAME *gn) {
             p = gn->d.ip->data;
             if (gn->d.ip->length == 4) {
                 BIO_printf(val_bio, "%i.%i.%i.%i", p[0], p[1], p[2], p[3]);
-                return 0;
+                break;
             } else if (gn->d.ip->length == 16) {
                 for (i = 0; i < 7; i++) {
                     BIO_printf(val_bio, "%X:", (p[0] << 4) | p[1]);
@@ -338,7 +338,9 @@ int getNamesFromAltSubjectNameExt(char **vals, X509_EXTENSION *ext) {
         if (status == 0) {
             BIO_printf(b, "%s:%s\n", type, val);
             free(type);
+            type = NULL;
             free(val);
+            val = NULL;
         }
     }
     BIO_flush(b);
