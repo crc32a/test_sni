@@ -118,7 +118,6 @@ int decodeX509NameComponents(X509_NAME *name, X509_NAME_components_t **comps) {
 
     for (i = 0; i < n_entries; i++) {
         ne = sk_X509_NAME_ENTRY_value(name->entries, i);
-        unsigned char *wtf = (unsigned char *) ne->object->data;
         nid = OBJ_obj2nid(ne->object);
         comps_st->entries[i].nid = nid;
         sn = (char *) OBJ_nid2sn(nid);
