@@ -2,7 +2,14 @@
 CF= -O0 -ggdb -I/opt/local/include -L/opt/local/lib -I/opt/openssl/include
 LIBS = -lcrypto -lssl
 
-all: test_sni_client lookup test_sni_server txt2nid parse_x509 nid2sn
+all: test_sni_client lookup test_sni_server txt2nid parse_x509 nid2sn \
+session_client	session_server
+
+session_client.o: session_client.c sockutils.h
+	cc $(CF) -c session_client.c
+
+session_server.o: session_server.c sockutils.h
+	cc $(CF) -c session_server.c
 
 parse_x509.o: sockutils.h parse_x509.c
 	cc $(CF) -c parse_x509.c
@@ -43,6 +50,12 @@ txt2nid: txt2nid.o sockutils.o
 parse_x509: parse_x509.o sockutils.o
 	cc $(CF) -o parse_x509 parse_x509.o sockutils.o $(LIBS)
 
+session_server: session_server.o sockutils.o
+	cc $(CF) -o session_server session_server.o sockutils.o $(LIBS)
+
+session_client: session_client.o sockutils.o
+	cc $(CF) -o session_client session_client.o sockutils.o $(LIBS)
+
 clean:
-	rm parse_x509 test_sni_client test_sni_server lookup txt2nid nid2sn *.o
+	rm parse_x509 test_sni_client test_sni_server lookup txt2nid nid2sn session_client session_server *.o
 

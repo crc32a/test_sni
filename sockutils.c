@@ -20,6 +20,31 @@
 
 char bit_vals[] = {'0', '1'};
 
+char hex_map[] = {'0', '1', '2', '3',
+    '4', '5', '6', '7',
+    '8', '9', 'a', 'b',
+    'c', 'd', 'e', 'f'};
+
+int char_to_hex(char **hex, char *data, int length) {
+    char *out = (char *) malloc(sizeof (char) *(length * 2 + 1));
+    int i = 0;
+    int j = 0;
+    unsigned char ch;
+    if (out == NULL) {
+        *hex = NULL;
+        return -1;
+    }
+    *hex = out;
+    for (i = 0; i < length; i++) {
+        ch = (unsigned char) data[i];
+        out[j + 0] = hex_map[ch >> 4];
+        out[j + 1] = hex_map[ch & 15];
+        j += 2;
+    }
+    out[j] = '\0';
+    return 0;
+}
+
 int read_file(char **buff, int fd) {
     char local_buff[BUFFSIZE + 1];
     char *drain_buff = NULL;
