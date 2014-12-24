@@ -424,6 +424,7 @@ int main(int argc, char **argv) {
         perror("Odd coulden't close x509 file:");
     }
     n_exts = X509_get_ext_count(x509);
+    printf("x509 contains %i extensions\n", n_exts);
     // Leak loop
     for (;;) {
         fmt = "pid[%i]: Enter number of times to decode file %s: ";
