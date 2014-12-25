@@ -14,7 +14,9 @@
 #include"sockutils.h"
 
 #define MYPATH_MAX 512
-#define STRSIZE 1024
+#define STRSIZE 128
+
+const char * const boolStr[] = {"false", "true"};
 
 typedef struct {
     char *short_name;
@@ -361,6 +363,7 @@ int main(int argc, char **argv) {
     char *line = NULL;
     char *file_name = NULL;
     char *obj_name = NULL;
+    char *oid_str = NULL;
     int tmp_size = 0;
     char *char_data = NULL;
     X509V3_CTX *ctx = NULL;
@@ -390,6 +393,10 @@ int main(int argc, char **argv) {
     if (file_name == NULL) {
         printf("Error allocating %i bytes for file_name\n", tmp_size);
     }
+    oid_str = (char *) malloc(tmp_size);
+    if (oid_str == NULL) {
+        printf("Error allocating %i bytes for oid buffer\n", tmp_size);
+    }
     tmp_size = sizeof (X509V3_CTX);
     ctx = (X509V3_CTX *) malloc(tmp_size);
     if (ctx == NULL) {
@@ -397,12 +404,18 @@ int main(int argc, char **argv) {
         printf(fmt, tmp_size);
         return -1;
     }
-    printf("Enter x509 file name: ");
-    fflush(stdout);
-    if (fgets(file_name, STRSIZE, stdin) == NULL) {
-        printf("Error reading file name from stdin\n");
-        return -1;
+    if (argc >= 2) {
+        strncpy(file_name, argv[1], STRSIZE);
+    } else {
+        printf("Enter x509 file name: ");
+        fflush(stdout);
+        if (fgets(file_name, STRSIZE, stdin) == NULL) {
+            printf("Error reading file name from stdin\n");
+            return -1;
+        }
     }
+
+
     chop(file_name);
     init_ssl_lib();
     out = BIO_new_fp(stdout, BIO_NOCLOSE);
@@ -456,8 +469,11 @@ int main(int argc, char **argv) {
                 nid = OBJ_obj2nid(ext->object);
                 obj_name = (char *) OBJ_nid2sn(nid);
                 if (j == n_loops) {
-                    fmt = "ext[%i]: nid=%i = \"%s\"\n";
-                    BIO_printf(out, fmt, i, nid, obj_name);
+                    fmt = "ext[%i]: nid=%i = \"%s\" oid = %s critical=%s data=\"%s\"\n";
+                    char_to_hex(&char_data, ext->object->data, ext->object->length);
+                    OBJ_obj2txt(oid_str, STRSIZE, ext->object, 1);
+                    BIO_printf(out, fmt, i, nid, obj_name, oid_str, boolStr[(ext->critical) & 0x1], char_data);
+                    free(char_data);
                 }
                 if (nid == NID_subject_alt_name) {
                     getNamesFromAltSubjectNameExt(&gn_str, ext);
