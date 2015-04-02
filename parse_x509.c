@@ -364,6 +364,7 @@ int main(int argc, char **argv) {
     char *file_name = NULL;
     char *obj_name = NULL;
     char *oid_str = NULL;
+    unsigned char *dataPtr = NULL;
     int tmp_size = 0;
     char *char_data = NULL;
     X509V3_CTX *ctx = NULL;
@@ -469,11 +470,13 @@ int main(int argc, char **argv) {
                 nid = OBJ_obj2nid(ext->object);
                 obj_name = (char *) OBJ_nid2sn(nid);
                 if (j == n_loops) {
-                    fmt = "ext[%i]: nid=%i = \"%s\" oid = %s critical=%s data=\"%s\"\n";
-                    char_to_hex(&char_data, ext->object->data, ext->object->length);
+                    fmt = "ext[%i]: nid=%i = \"%s\" oid = %s critical=%s len = %i data=\"%s\"\n";
+                    dataPtr = ext->value->data;
+                    tmp_size = ext->value->length;
+                    char_to_hex(&char_data, dataPtr, tmp_size);
                     OBJ_obj2txt(oid_str, STRSIZE, ext->object, 1);
-                    BIO_printf(out, fmt, i, nid, obj_name, oid_str, boolStr[(ext->critical) & 0x1], char_data);
-                    free(char_data);
+                    BIO_printf(out, fmt, i, nid, obj_name, oid_str, boolStr[(ext->critical) & 0x1], tmp_size,char_data);
+//                    free(char_data);
                 }
                 if (nid == NID_subject_alt_name) {
                     getNamesFromAltSubjectNameExt(&gn_str, ext);

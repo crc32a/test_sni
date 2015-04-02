@@ -9,3 +9,5 @@ parse_x509
 lookup
 txt2nid
 Makefile-test_sni.mk
+session_server
+session_client
