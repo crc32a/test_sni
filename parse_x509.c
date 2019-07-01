@@ -31,6 +31,16 @@ typedef struct {
     int n_entries;
 } X509_NAME_components_t;
 
+int X509_NAME_components_new(X509_NAME_components_t **comps, int n_entries);
+int X509_NAME_components_free(X509_NAME_components_t *st);
+int decodeX509NameComponents(X509_NAME *name, X509_NAME_components_t **comps);
+int get_subject(char **subject, X509 * x509);
+int get_issuer(char **issuer, X509 * x509);
+int x509comps_string(char **str, X509_NAME_components_t *comps);
+int get_general_name_string(char **type, char **val, GENERAL_NAME *gn);
+int getNamesFromAltSubjectNameExt(char **vals, X509_EXTENSION *ext);
+
+
 int usage(char *prog) {
     printf("usage %s <x509_pem>\n", prog);
     printf("\n");
@@ -317,6 +327,7 @@ int get_general_name_string(char **type, char **val, GENERAL_NAME *gn) {
     BIO_free(val_bio);
     return status;
 }
+
 
 int getNamesFromAltSubjectNameExt(char **vals, X509_EXTENSION *ext) {
     BIO *b = NULL;

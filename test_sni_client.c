@@ -27,7 +27,7 @@ typedef struct {
 } sslcontainer_t;
 
 int usage(char *prog) {
-    printf("usage is %s <sni hostname> <target host> <port> [ipv4|ipv5|any]\n",
+    printf("usage is %s <sni hostname> <target host> <port> [ipv4|ipv6|any]\n",
             prog);
     return -1;
 }

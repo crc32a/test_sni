@@ -16,7 +16,7 @@ typedef struct {
 } string_list_t;
 #endif
 
-
+int char_to_hex(char **hex, char *data, int length);
 int free_string_list(string_list_t *sl);
 int chop(char *str_in);
 int split_string(string_list_t *sl, char *strin, char split_ch);
